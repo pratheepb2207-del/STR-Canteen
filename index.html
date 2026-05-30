@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>STR Canteen</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f1923">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0f14;
+  --surface: #111920;
+  --surface2: #1a2530;
+  --border: rgba(255,255,255,0.07);
+  --accent: #f0a500;
+  --accent2: #e05c00;
+  --green: #22c97a;
+  --red: #e84040;
+  --text: #f0ece4;
+  --muted: #7a8a96;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow: hidden; }
+
+/* SPLASH */
+#splash {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 1000; transition: opacity 0.6s ease;
+}
+#splash .logo { font-family: var(--font-display); font-size: 72px; color: var(--accent); letter-spacing: 4px; line-height: 1; }
+#splash .sub { font-size: 13px; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-top: 8px; }
+#splash .loading-bar { width: 120px; height: 2px; background: var(--surface2); border-radius: 2px; margin-top: 40px; overflow: hidden; }
+#splash .loading-fill { height: 100%; background: var(--accent); border-radius: 2px; animation: fillbar 1.8s ease forwards; }
+@keyframes fillbar { from { width: 0% } to { width: 100% } }
+
+/* LAYOUT */
+#app { display: flex; flex-direction: column; height: 100vh; opacity: 0; transition: opacity 0.5s ease; }
+#app.visible { opacity: 1; }
+
+/* HEADER */
+.header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.header-top { display: flex; align-items: center; justify-content: space-between; }
+.canteen-name { font-family: var(--font-display); font-size: 28px; color: var(--accent); letter-spacing: 2px; }
+.location-pill {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--muted);
+  background: var(--surface2); border-radius: 20px; padding: 4px 10px;
+}
+.loc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.loc-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.date-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.date-text { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.owner-text { font-size: 12px; color: var(--muted); }
+
+/* SUMMARY CARDS */
+.summary {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; padding: 12px 16px;
+  background: var(--bg); flex-shrink: 0;
+}
+.sum-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px;
+}
+.sum-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.sum-val { font-family: var(--font-mono); font-size: 16px; font-weight: 500; }
+.sum-val.green { color: var(--green); }
+.sum-val.red { color: var(--red); }
+.sum-val.accent { color: var(--accent); }
+
+/* TABS */
+.tabs {
+  display: flex; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.tab {
+  flex: 1; padding: 10px 4px; font-size: 12px; font-weight: 500;
+  color: var(--muted); border: none; background: none; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.2s;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* CONTENT AREA */
+.content { flex: 1; overflow-y: auto; padding: 16px; }
+.content::-webkit-scrollbar { width: 3px; }
+.content::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+/* SECTION */
+.section { display: none; }
+.section.active { display: block; }
+
+/* TRANSACTION ITEMS */
+.tx-group-label {
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 1.5px; margin: 12px 0 6px; font-family: var(--font-mono);
+}
+.tx-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px; animation: slidein 0.3s ease;
+}
+@keyframes slidein { from { opacity:0; transform: translateY(6px) } to { opacity:1; transform:none } }
+.tx-icon {
+  width: 36px; height: 36px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px;
+}
+.tx-icon.credit { background: rgba(34,201,122,0.12); }
+.tx-icon.debit { background: rgba(232,64,64,0.12); }
+.tx-icon.manual { background: rgba(240,165,0,0.12); }
+.tx-body { flex: 1; min-width: 0; }
+.tx-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: var(--font-mono); }
+.tx-amt { font-family: var(--font-mono); font-size: 15px; font-weight: 500; flex-shrink: 0; }
+.tx-amt.credit { color: var(--green); }
+.tx-amt.debit { color: var(--red); }
+.tx-amt.manual { color: var(--accent); }
+
+/* EXPENSE FORM */
+.form-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; margin-bottom: 12px;
+}
+.form-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.inp { 
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; color: var(--text);
+  font-family: var(--font-body); font-size: 14px; margin-bottom: 8px;
+  outline: none; transition: border 0.2s;
+}
+.inp:focus { border-color: var(--accent); }
+.inp::placeholder { color: var(--muted); }
+select.inp option { background: var(--surface); }
+.btn {
+  width: 100%; padding: 12px; border-radius: 10px; border: none;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+}
+.btn-primary { background: var(--accent); color: #0a0f14; }
+.btn-primary:active { transform: scale(0.98); background: var(--accent2); }
+.btn-danger { background: rgba(232,64,64,0.15); color: var(--red); border: 1px solid rgba(232,64,64,0.3); margin-top: 8px; }
+
+/* SUPPLIER LIST */
+.supplier-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.sup-avatar {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 16px; color: var(--accent);
+  flex-shrink: 0;
+}
+.sup-body { flex: 1; min-width: 0; }
+.sup-name { font-size: 13px; font-weight: 500; }
+.sup-meta { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sup-cats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.cat-tag {
+  font-size: 10px; padding: 2px 7px; border-radius: 20px;
+  background: rgba(240,165,0,0.12); color: var(--accent); font-weight: 500;
+}
+.del-btn {
+  background: none; border: none; color: var(--muted); font-size: 18px;
+  cursor: pointer; padding: 4px; flex-shrink: 0;
+}
+
+/* REPORT SECTION */
+.report-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; margin-bottom: 12px;
+}
+.report-header { 
+  font-family: var(--font-display); font-size: 22px; color: var(--accent);
+  letter-spacing: 1px; margin-bottom: 4px;
+}
+.report-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.report-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.report-row:last-child { border-bottom: none; }
+.report-key { font-size: 13px; color: var(--muted); }
+.report-val { font-family: var(--font-mono); font-size: 14px; font-weight: 500; }
+.profit-row { 
+  background: rgba(240,165,0,0.08); border: 1px solid rgba(240,165,0,0.2);
+  border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.profit-label { font-size: 13px; font-weight: 600; color: var(--accent); }
+.profit-val { font-family: var(--font-mono); font-size: 20px; font-weight: 500; color: var(--accent); }
+.btn-whatsapp {
+  width: 100%; padding: 14px; border-radius: 10px; border: none;
+  background: #25D366; color: #fff; font-family: var(--font-body);
+  font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.2s;
+}
+.btn-whatsapp:active { transform: scale(0.98); opacity: 0.9; }
+
+/* EMPTY STATE */
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 10px 20px; font-size: 13px; color: var(--text);
+  opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 999; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* LOCATION BANNER */
+.loc-banner {
+  background: rgba(240,165,0,0.08); border: 1px solid rgba(240,165,0,0.2);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
+  font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px;
+}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="logo">STR</div>
+  <div class="sub">Canteen Tracker</div>
+  <div class="loading-bar"><div class="loading-fill"></div></div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="canteen-name">STR Canteen</div>
+      <div class="location-pill">
+        <div class="loc-dot" id="loc-dot"></div>
+        <span id="loc-text">Locating...</span>
+      </div>
+    </div>
+    <div class="date-row">
+      <div class="date-text" id="date-text"></div>
+      <div class="owner-text">Thiruvengadaraja</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-card">
+      <div class="sum-label">Income</div>
+      <div class="sum-val green" id="sum-income">₹0</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Expense</div>
+      <div class="sum-val red" id="sum-expense">₹0</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Profit</div>
+      <div class="sum-val accent" id="sum-profit">₹0</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('transactions')">Transactions</button>
+    <button class="tab" onclick="switchTab('expenses')">Add Expense</button>
+    <button class="tab" onclick="switchTab('suppliers')">Suppliers</button>
+    <button class="tab" onclick="switchTab('report')">Report</button>
+  </div>
+
+  <div class="content">
+
+    <!-- TRANSACTIONS -->
+    <div class="section active" id="tab-transactions">
+      <div id="loc-banner-wrap"></div>
+      <div id="tx-list">
+        <div class="empty"><div class="empty-icon">📋</div>No transactions yet today.<br>SMS will be picked up automatically.</div>
+      </div>
+    </div>
+
+    <!-- ADD EXPENSE -->
+    <div class="section" id="tab-expenses">
+      <div class="form-card">
+        <div class="form-title">Log a purchase / expense</div>
+        <input class="inp" type="text" id="exp-desc" placeholder="What did he buy? e.g. 10 cakes, 20 puffs">
+        <input class="inp" type="number" id="exp-amt" placeholder="Amount in ₹" inputmode="numeric">
+        <select class="inp" id="exp-supplier">
+          <option value="">Select supplier (optional)</option>
+        </select>
+        <button class="btn btn-primary" onclick="addExpense()">Add Expense</button>
+      </div>
+
+      <div class="form-card">
+        <div class="form-title">Today's manual expenses</div>
+        <div id="manual-exp-list">
+          <div class="empty" style="padding:16px 0"><div class="empty-icon">🧾</div>No manual expenses added yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div class="section" id="tab-suppliers">
+      <div class="form-card">
+        <div class="form-title">Add supplier</div>
+        <input class="inp" type="text" id="sup-name" placeholder="Supplier name">
+        <input class="inp" type="text" id="sup-upi" placeholder="UPI ID (e.g. name@okaxis)">
+        <input class="inp" type="text" id="sup-phone" placeholder="Phone number (optional)">
+        <input class="inp" type="text" id="sup-cats" placeholder="Categories (e.g. Baked items, Puffs, Bread)">
+        <input class="inp" type="text" id="sup-note" placeholder="Notes (optional)">
+        <button class="btn btn-primary" onclick="addSupplier()">Save Supplier</button>
+      </div>
+      <div id="sup-list"></div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="section" id="tab-report">
+      <div class="report-card">
+        <div class="report-header">Daily Report</div>
+        <div class="report-sub" id="report-date"></div>
+        <div class="report-row">
+          <span class="report-key">💰 Total UPI income</span>
+          <span class="report-val green" id="r-income">₹0</span>
+        </div>
+        <div class="report-row">
+          <span class="report-key">📦 Auto-detected expenses</span>
+          <span class="report-val red" id="r-auto-exp">₹0</span>
+        </div>
+        <div class="report-row">
+          <span class="report-key">🧾 Manual expenses</span>
+          <span class="report-val red" id="r-man-exp">₹0</span>
+        </div>
+        <div class="report-row">
+          <span class="report-key">📊 Total transactions</span>
+          <span class="report-val" id="r-count">0</span>
+        </div>
+        <div class="profit-row">
+          <span class="profit-label">Today's Profit</span>
+          <span class="profit-val" id="r-profit">₹0</span>
+        </div>
+      </div>
+
+      <div class="report-card">
+        <div class="form-title">Supplier-wise expenses</div>
+        <div id="r-suppliers"></div>
+      </div>
+
+      <button class="btn-whatsapp" onclick="sendWhatsApp()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Send Report to WhatsApp
+      </button>
+      <button class="btn btn-danger" onclick="clearDay()">Clear Today's Data</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+const CONFIG = {
+  lat: 9.0093024,
+  lng: 77.2497885,
+  radius: 300, // metres
+  whatsapp: '919843812615',
+  reportTime: { h: 21, m: 0 },
+  bankSender: ['canara', 'canarabank', 'cnrb'],
+  creditKeyword: 'CREDITED',
+  debitKeyword: 'DEBITED',
+};
+
+// ── STATE ────────────────────────────────────────────────────────
+let state = {
+  transactions: [],
+  manualExpenses: [],
+  suppliers: [],
+  insideCampus: false,
+  lastSMSCheck: null,
+};
+
+function todayKey() { return new Date().toISOString().slice(0,10); }
+
+function loadState() {
+  const saved = localStorage.getItem('str_state_' + todayKey());
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    state.transactions = parsed.transactions || [];
+    state.manualExpenses = parsed.manualExpenses || [];
+  }
+  const sups = localStorage.getItem('str_suppliers');
+  if (sups) state.suppliers = JSON.parse(sups);
+}
+
+function saveState() {
+  localStorage.setItem('str_state_' + todayKey(), JSON.stringify({
+    transactions: state.transactions,
+    manualExpenses: state.manualExpenses,
+  }));
+  localStorage.setItem('str_suppliers', JSON.stringify(state.suppliers));
+}
+
+// ── UI UTILS ─────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function fmt(amt) { return '₹' + Number(amt).toFixed(2).replace(/\.00$/,''); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'report') updateReport();
+  if (tab === 'suppliers') renderSuppliers();
+  if (tab === 'expenses') renderManualExpenses();
+}
+
+// ── DATE ─────────────────────────────────────────────────────────
+function updateDate() {
+  const now = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('date-text').textContent =
+    days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+  document.getElementById('report-date').textContent =
+    'STR Canteen — ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+}
+
+// ── LOCATION ─────────────────────────────────────────────────────
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function checkLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(pos => {
+    const dist = haversine(pos.coords.latitude, pos.coords.longitude, CONFIG.lat, CONFIG.lng);
+    state.insideCampus = dist <= CONFIG.radius;
+    const dot = document.getElementById('loc-dot');
+    const txt = document.getElementById('loc-text');
+    const banner = document.getElementById('loc-banner-wrap');
+    if (state.insideCampus) {
+      dot.classList.add('active');
+      txt.textContent = 'Inside campus';
+      banner.innerHTML = '';
+    } else {
+      dot.classList.remove('active');
+      txt.textContent = 'Outside campus';
+      banner.innerHTML = `<div class="loc-banner">⚠️ Outside campus — UPI credits will not be logged as income</div>`;
+    }
+  }, null, { enableHighAccuracy: true, maximumAge: 30000 });
+}
+
+// ── SMS PARSING ───────────────────────────────────────────────────
+function parseSMS(body, sender, timestamp) {
+  const upper = body.toUpperCase();
+  const senderLower = (sender || '').toLowerCase();
+  const isBank = CONFIG.bankSender.some(k => senderLower.includes(k) || body.toLowerCase().includes(k));
+  if (!isBank) return null;
+
+  const amtMatch = body.match(/INR\s?([\d,]+\.?\d*)/i);
+  if (!amtMatch) return null;
+  const amount = parseFloat(amtMatch[1].replace(/,/g, ''));
+
+  if (upper.includes(CONFIG.creditKeyword)) {
+    return { type: 'credit', amount, source: 'Bank SMS', time: timestamp || Date.now(), raw: body };
+  }
+  if (upper.includes(CONFIG.debitKeyword)) {
+    return { type: 'debit', amount, source: 'Bank SMS', time: timestamp || Date.now(), raw: body };
+  }
+  return null;
+}
+
+// ── TRANSACTIONS ─────────────────────────────────────────────────
+function addTransaction(tx) {
+  const exists = state.transactions.find(t => t.raw === tx.raw);
+  if (exists) return;
+  state.transactions.unshift({ ...tx, id: Date.now() + Math.random() });
+  saveState();
+  renderTransactions();
+  updateSummary();
+  toast(tx.type === 'credit' ? '✅ Income logged: ' + fmt(tx.amount) : '📦 Expense detected: ' + fmt(tx.amount));
+}
+
+function renderTransactions() {
+  const list = document.getElementById('tx-list');
+  if (state.transactions.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>No transactions yet today.<br>SMS will be picked up automatically.</div>';
+    return;
+  }
+  list.innerHTML = state.transactions.map(tx => {
+    const t = new Date(tx.time);
+    const timeStr = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+    const icon = tx.type === 'credit' ? '📈' : tx.type === 'debit' ? '📉' : '🧾';
+    const cls = tx.type === 'credit' ? 'credit' : tx.type === 'debit' ? 'debit' : 'manual';
+    const sign = tx.type === 'credit' ? '+' : '-';
+    return `<div class="tx-item">
+      <div class="tx-icon ${cls}">${icon}</div>
+      <div class="tx-body">
+        <div class="tx-title">${tx.source || 'UPI Transaction'}</div>
+        <div class="tx-sub">${timeStr} · ${tx.type.toUpperCase()}</div>
+      </div>
+      <div class="tx-amt ${cls}">${sign}${fmt(tx.amount)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── SUMMARY ──────────────────────────────────────────────────────
+function updateSummary() {
+  const income = state.transactions.filter(t => t.type === 'credit').reduce((s,t) => s + t.amount, 0);
+  const autoExp = state.transactions.filter(t => t.type === 'debit').reduce((s,t) => s + t.amount, 0);
+  const manExp = state.manualExpenses.reduce((s,e) => s + e.amount, 0);
+  const totalExp = autoExp + manExp;
+  const profit = income - totalExp;
+  document.getElementById('sum-income').textContent = fmt(income);
+  document.getElementById('sum-expense').textContent = fmt(totalExp);
+  document.getElementById('sum-profit').textContent = fmt(profit);
+  document.getElementById('sum-profit').style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+// ── MANUAL EXPENSES ───────────────────────────────────────────────
+function addExpense() {
+  const desc = document.getElementById('exp-desc').value.trim();
+  const amt = parseFloat(document.getElementById('exp-amt').value);
+  const sup = document.getElementById('exp-supplier').value;
+  if (!desc || !amt || amt <= 0) { toast('⚠️ Please enter description and amount'); return; }
+  const expense = { id: Date.now(), desc, amount: amt, supplier: sup, time: Date.now() };
+  state.manualExpenses.unshift(expense);
+  // also add to transactions for visibility
+  state.transactions.unshift({ id: Date.now() + 1, type: 'manual', amount: amt, source: desc + (sup ? ' ('+sup+')' : ''), time: Date.now() });
+  saveState();
+  document.getElementById('exp-desc').value = '';
+  document.getElementById('exp-amt').value = '';
+  document.getElementById('exp-supplier').selectedIndex = 0;
+  renderManualExpenses();
+  renderTransactions();
+  updateSummary();
+  toast('✅ Expense added: ' + fmt(amt));
+}
+
+function renderManualExpenses() {
+  const list = document.getElementById('manual-exp-list');
+  if (state.manualExpenses.length === 0) {
+    list.innerHTML = '<div class="empty" style="padding:16px 0"><div class="empty-icon">🧾</div>No manual expenses added yet.</div>';
+    return;
+  }
+  list.innerHTML = state.manualExpenses.map(e => {
+    const t = new Date(e.time);
+    const timeStr = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+    return `<div class="tx-item">
+      <div class="tx-icon debit">🧾</div>
+      <div class="tx-body">
+        <div class="tx-title">${e.desc}</div>
+        <div class="tx-sub">${timeStr}${e.supplier ? ' · '+e.supplier : ''}</div>
+      </div>
+      <div class="tx-amt debit">-${fmt(e.amount)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── SUPPLIERS ─────────────────────────────────────────────────────
+function addSupplier() {
+  const name = document.getElementById('sup-name').value.trim();
+  const upi = document.getElementById('sup-upi').value.trim();
+  const phone = document.getElementById('sup-phone').value.trim();
+  const cats = document.getElementById('sup-cats').value.trim();
+  const note = document.getElementById('sup-note').value.trim();
+  if (!name) { toast('⚠️ Please enter supplier name'); return; }
+  state.suppliers.push({ id: Date.now(), name, upi, phone, cats: cats.split(',').map(c=>c.trim()).filter(Boolean), note });
+  saveState();
+  ['sup-name','sup-upi','sup-phone','sup-cats','sup-note'].forEach(id => document.getElementById(id).value = '');
+  renderSuppliers();
+  updateSupplierDropdown();
+  toast('✅ Supplier saved: ' + name);
+}
+
+function deleteSupplier(id) {
+  state.suppliers = state.suppliers.filter(s => s.id !== id);
+  saveState();
+  renderSuppliers();
+  updateSupplierDropdown();
+  toast('🗑️ Supplier removed');
+}
+
+function renderSuppliers() {
+  const list = document.getElementById('sup-list');
+  if (state.suppliers.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">🤝</div>No suppliers added yet.</div>';
+    return;
+  }
+  list.innerHTML = state.suppliers.map(s => `
+    <div class="supplier-item">
+      <div class="sup-avatar">${s.name.charAt(0).toUpperCase()}</div>
+      <div class="sup-body">
+        <div class="sup-name">${s.name}</div>
+        <div class="sup-meta">${[s.upi, s.phone, s.note].filter(Boolean).join(' · ') || 'No UPI saved'}</div>
+        <div class="sup-cats">${s.cats.map(c => `<span class="cat-tag">${c}</span>`).join('')}</div>
+      </div>
+      <button class="del-btn" onclick="deleteSupplier(${s.id})">🗑</button>
+    </div>
+  `).join('');
+}
+
+function updateSupplierDropdown() {
+  const sel = document.getElementById('exp-supplier');
+  sel.innerHTML = '<option value="">Select supplier (optional)</option>' +
+    state.suppliers.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+}
+
+// ── REPORT ────────────────────────────────────────────────────────
+function updateReport() {
+  const income = state.transactions.filter(t => t.type === 'credit').reduce((s,t) => s + t.amount, 0);
+  const autoExp = state.transactions.filter(t => t.type === 'debit').reduce((s,t) => s + t.amount, 0);
+  const manExp = state.manualExpenses.reduce((s,e) => s + e.amount, 0);
+  const profit = income - autoExp - manExp;
+
+  document.getElementById('r-income').textContent = fmt(income);
+  document.getElementById('r-auto-exp').textContent = fmt(autoExp);
+  document.getElementById('r-man-exp').textContent = fmt(manExp);
+  document.getElementById('r-count').textContent = state.transactions.filter(t => t.type === 'credit').length + ' payments';
+  document.getElementById('r-profit').textContent = fmt(profit);
+  document.getElementById('r-profit').style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Supplier breakdown
+  const supDiv = document.getElementById('r-suppliers');
+  const supMap = {};
+  state.manualExpenses.forEach(e => {
+    if (e.supplier) supMap[e.supplier] = (supMap[e.supplier] || 0) + e.amount;
+  });
+  if (Object.keys(supMap).length === 0) {
+    supDiv.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:8px 0">No supplier-linked expenses yet.</div>';
+  } else {
+    supDiv.innerHTML = Object.entries(supMap).map(([name, amt]) =>
+      `<div class="report-row"><span class="report-key">${name}</span><span class="report-val red">-${fmt(amt)}</span></div>`
+    ).join('');
+  }
+}
+
+// ── WHATSAPP REPORT ───────────────────────────────────────────────
+function buildReport() {
+  const now = new Date();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr = now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+
+  const income = state.transactions.filter(t => t.type === 'credit').reduce((s,t) => s + t.amount, 0);
+  const autoExp = state.transactions.filter(t => t.type === 'debit').reduce((s,t) => s + t.amount, 0);
+  const manExp = state.manualExpenses.reduce((s,e) => s + e.amount, 0);
+  const totalExp = autoExp + manExp;
+  const profit = income - totalExp;
+  const txCount = state.transactions.filter(t => t.type === 'credit').length;
+
+  const supMap = {};
+  state.manualExpenses.forEach(e => {
+    if (e.supplier) supMap[e.supplier] = (supMap[e.supplier] || 0) + e.amount;
+  });
+  const supLines = Object.entries(supMap).map(([n,a]) => `   • ${n}: -₹${a.toFixed(2)}`).join('\n');
+  const manLines = state.manualExpenses.filter(e => !e.supplier).map(e => `   • ${e.desc}: -₹${e.amount.toFixed(2)}`).join('\n');
+
+  const english = `📊 *STR Canteen — Daily Report*
+📅 ${dateStr}
+
+💰 *Income (UPI)*
+   Total received: ₹${income.toFixed(2)}
+   Transactions: ${txCount} payments
+
+🛒 *Expenses*
+${supLines || '   (none)'}
+${manLines ? manLines : ''}
+   Auto-detected debits: ₹${autoExp.toFixed(2)}
+   Manual entries: ₹${manExp.toFixed(2)}
+   *Total spent: ₹${totalExp.toFixed(2)}*
+
+📈 *Today's Profit: ₹${profit.toFixed(2)}*
+${profit >= 0 ? '✅ Good day!' : '⚠️ Expenses exceeded income'}
+
+— STR Canteen Tracker`;
+
+  const tamil = `\n---\n📊 *STR கேன்டீன் — தினசரி அறிக்கை*
+📅 ${dateStr}
+
+💰 *வருமானம் (UPI)*
+   மொத்தம் பெற்றது: ₹${income.toFixed(2)}
+   பரிவர்த்தனைகள்: ${txCount}
+
+🛒 *செலவுகள்*
+   மொத்தம்: ₹${totalExp.toFixed(2)}
+
+📈 *இன்றைய லாபம்: ₹${profit.toFixed(2)}*`;
+
+  return english + tamil;
+}
+
+function sendWhatsApp() {
+  updateReport();
+  const msg = buildReport();
+  const url = 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// ── CLEAR DAY ────────────────────────────────────────────────────
+function clearDay() {
+  if (!confirm('Clear all of today\'s data?')) return;
+  state.transactions = [];
+  state.manualExpenses = [];
+  saveState();
+  renderTransactions();
+  renderManualExpenses();
+  updateSummary();
+  updateReport();
+  toast('🗑️ Today\'s data cleared');
+}
+
+// ── SCHEDULED REPORT ─────────────────────────────────────────────
+function scheduleReport() {
+  setInterval(() => {
+    const now = new Date();
+    if (now.getHours() === CONFIG.reportTime.h && now.getMinutes() === CONFIG.reportTime.m) {
+      const lastSent = localStorage.getItem('str_report_sent');
+      if (lastSent !== todayKey()) {
+        localStorage.setItem('str_report_sent', todayKey());
+        sendWhatsApp();
+      }
+    }
+  }, 60000);
+}
+
+// ── SIMULATED SMS (for testing) ───────────────────────────────────
+// In real deployment, use Android SMS broadcast receiver
+// This demo lets you test by entering sample SMS text
+function injectTestSMS(body) {
+  const tx = parseSMS(body, 'canara', Date.now());
+  if (tx) {
+    if (tx.type === 'credit' && !state.insideCampus) {
+      toast('ℹ️ Credit SMS received but outside campus — not logged');
+      return;
+    }
+    addTransaction(tx);
+  } else {
+    toast('⚠️ Could not parse SMS format');
+  }
+}
+
+// expose for Android WebView bridge
+window.onSMSReceived = function(sender, body, timestamp) {
+  const tx = parseSMS(body, sender, timestamp);
+  if (!tx) return;
+  if (tx.type === 'credit' && !state.insideCampus) return;
+  addTransaction(tx);
+};
+
+// ── INIT ──────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('splash').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('splash').style.display = 'none';
+      document.getElementById('app').classList.add('visible');
+    }, 600);
+  }, 2000);
+
+  loadState();
+  updateDate();
+  checkLocation();
+  renderTransactions();
+  renderSuppliers();
+  updateSupplierDropdown();
+  updateSummary();
+  scheduleReport();
+  setInterval(updateDate, 60000);
+});
+</script>
+</body>
+</html>
